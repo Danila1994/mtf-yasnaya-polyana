@@ -56,10 +56,13 @@ export default function DashboardPage() {
               </div>
             </Link>
 
-            <div className="panel">
+            <Link className="panel" href="/dashboard/reproduction" style={{ textDecoration: "none" }}>
               <h2 className="panel-title">Воспроизводство</h2>
-              <p className="muted">Раздел заложен под следующий этап. Будут KPI, осеменения, стельность, прогноз отёлов.</p>
-            </div>
+              <p className="muted">Текущее состояние, долгосрочная перспектива, история, прогноз отёлов и связь с будущим молоком.</p>
+              <div className="btn btn-primary" style={{ marginTop: 14 }}>
+                Открыть модуль
+              </div>
+            </Link>
 
             <div className="panel">
               <h2 className="panel-title">Ветеринария</h2>
