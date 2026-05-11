@@ -187,6 +187,8 @@ function calcDay(dayItem: DayMilk) {
   const fat = market ? (dayItem.elTank * dayItem.elFat + dayItem.carTank * dayItem.carFat) / market : 0;
   const deliveriesTotal = dayItem.deliveries.reduce((sum, delivery) => sum + toNum(delivery.liters), 0);
   const revenue = dayItem.deliveries.reduce((sum, delivery) => sum + toNum(delivery.liters) * toNum(delivery.price), 0);
+  const notDistributed = market - deliveriesTotal;
+  const diffPct = market ? Math.abs(notDistributed) / market * 100 : 0;
 
   return {
     elGross,
@@ -199,7 +201,8 @@ function calcDay(dayItem: DayMilk) {
     avg: heads ? gross / heads : 0,
     mastitisPct: gross ? (mastitis / gross) * 100 : 0,
     deliveriesTotal,
-    notDistributed: market - deliveriesTotal,
+    notDistributed,
+    diffPct,
     revenue,
   };
 }
