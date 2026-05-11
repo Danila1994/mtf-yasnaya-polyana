@@ -403,7 +403,7 @@ function LongTermTab({ latest, history }: { latest: ReproMonth; history: ReproMo
         <Kpi icon="🐄" title="Тёлки 16+" value={`${fmt(latest.heifers16Plus)} гол`} note={`${fmt(latest.heifersInseminated)} осеменено`} />
         <Kpi icon="✓" title="Стельные тёлки" value={`${fmt(latest.heifersPregnant)} гол`} note="ремонт стада" />
         <Kpi icon="!" title="Открытые 150+ DIM" value={`${fmt(latest.open150Plus)} гол`} note="риск растяжки лактации" />
-        <Kpi icon="!!" title="Открытые 200+ DIM" value={`${fmt(latest.open200Plus)} гол`} note="высокий риск"} />
+        <Kpi icon="!!" title="Открытые 200+ DIM" value={`${fmt(latest.open200Plus)} гол`} note="высокий риск" />
       </section>
 
       <section className="grid-2">
