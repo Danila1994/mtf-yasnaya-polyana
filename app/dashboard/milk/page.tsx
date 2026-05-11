@@ -48,6 +48,7 @@ type Tab = "input" | "overview" | "archive" | "plants" | "forecast";
 const LOGIN_KEY = "mtf-auth";
 const MONTHS = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 const SHORT_MONTHS = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+const BASE_FAT = 3.5;
 
 const historicalRows: MonthFact[] = [
   { month: "Январь", year: 2024, gross: 439847, market: 421300, mastitis: 18547, fat: 3.72, protein: 3.18, revenue: 22539000 },
@@ -177,6 +178,11 @@ function pct(value: number, digits = 1) {
   return `${fmt(value, digits)}%`;
 }
 
+function basisKg(weight: number, fat: number) {
+  if (!weight || !fat) return 0;
+  return weight * fat / BASE_FAT;
+}
+
 function calcDay(dayItem: DayMilk) {
   const elGross = dayItem.elTank + dayItem.elMastitis;
   const carGross = dayItem.carTank + dayItem.carMastitis;
@@ -185,9 +191,12 @@ function calcDay(dayItem: DayMilk) {
   const mastitis = dayItem.elMastitis + dayItem.carMastitis;
   const gross = market + mastitis;
   const fat = market ? (dayItem.elTank * dayItem.elFat + dayItem.carTank * dayItem.carFat) / market : 0;
+  const basis = basisKg(market, fat);
   const deliveriesTotal = dayItem.deliveries.reduce((sum, delivery) => sum + toNum(delivery.liters), 0);
-  const revenue = dayItem.deliveries.reduce((sum, delivery) => sum + toNum(delivery.liters) * toNum(delivery.price), 0);
+  const deliveriesBasis = dayItem.deliveries.reduce((sum, delivery) => sum + basisKg(toNum(delivery.liters), toNum(delivery.fat)), 0);
+  const revenue = dayItem.deliveries.reduce((sum, delivery) => sum + basisKg(toNum(delivery.liters), toNum(delivery.fat)) * toNum(delivery.price), 0);
   const notDistributed = market - deliveriesTotal;
+  const notDistributedBasis = basis - deliveriesBasis;
   const diffPct = market ? Math.abs(notDistributed) / market * 100 : 0;
 
   return {
@@ -198,10 +207,13 @@ function calcDay(dayItem: DayMilk) {
     mastitis,
     gross,
     fat,
+    basis,
     avg: heads ? gross / heads : 0,
     mastitisPct: gross ? (mastitis / gross) * 100 : 0,
     deliveriesTotal,
+    deliveriesBasis,
     notDistributed,
+    notDistributedBasis,
     diffPct,
     revenue,
   };
@@ -261,6 +273,7 @@ export default function MilkPage() {
     const market = dayCalcs.reduce((sum, item) => sum + item.market, 0);
     const mastitis = dayCalcs.reduce((sum, item) => sum + item.mastitis, 0);
     const revenue = dayCalcs.reduce((sum, item) => sum + item.revenue, 0);
+    const basis = dayCalcs.reduce((sum, item) => sum + item.basis, 0);
     const fatWeighted = days.reduce((sum, item) => sum + calcDay(item).market * calcDay(item).fat, 0);
     const headsSum = dayCalcs.reduce((sum, item) => sum + item.heads, 0);
 
@@ -269,6 +282,7 @@ export default function MilkPage() {
       market,
       mastitis,
       revenue,
+      basis,
       avgFat: market ? fatWeighted / market : 0,
       avgMilk: headsSum ? gross / headsSum : 0,
       mastitisPct: gross ? (mastitis / gross) * 100 : 0,
@@ -658,8 +672,9 @@ function DataInput({
             <div className={diffClass}>
               <h2 className="panel-title">Контроль расхождения</h2>
               <div className="driver-grid" style={{ gridTemplateColumns: "1fr" }}>
-                <MiniStat title="Товарное по доению" value={`${fmt(selectedDayCalc.market)} кг`} note="Ёлочка + Карусель" />
-                <MiniStat title="Распределено" value={`${fmt(selectedDayCalc.deliveriesTotal)} кг`} note="заводы, телята, прочее" />
+                <MiniStat title="Товарное по доению" value={`${fmt(selectedDayCalc.market)} кг`} note="фактический вес" />
+                <MiniStat title="Базис по доению" value={`${fmt(selectedDayCalc.basis)} кг`} note={`жир / ${BASE_FAT}`} />
+                <MiniStat title="Распределено" value={`${fmt(selectedDayCalc.deliveriesTotal)} кг`} note={`базис: ${fmt(selectedDayCalc.deliveriesBasis)} кг`} />
                 <MiniStat title="Разница" value={`${fmt(selectedDayCalc.notDistributed)} кг`} note={`${fmt(selectedDayCalc.diffPct, 2)}% от товарного`} />
               </div>
             </div>
@@ -694,7 +709,8 @@ function DataInput({
               <h2 className="panel-title">Итог дня</h2>
               <div className="driver-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 <MiniStat title="Вал" value={`${fmt(selectedDayCalc.gross)} кг`} note="танк + мастит" />
-                <MiniStat title="Товарное" value={`${fmt(selectedDayCalc.market)} кг`} note="по доению" />
+                <MiniStat title="Товарное" value={`${fmt(selectedDayCalc.market)} кг`} note="фактический вес" />
+                <MiniStat title="Базис" value={`${fmt(selectedDayCalc.basis)} кг`} note={`по жирности ${BASE_FAT}%`} />
                 <MiniStat title="Мастит" value={`${fmt(selectedDayCalc.mastitis)} кг`} note={pct(selectedDayCalc.mastitisPct, 2)} />
                 <MiniStat title="Средний удой" value={`${fmt(selectedDayCalc.avg, 1)} кг`} note="на голову" />
               </div>
@@ -753,7 +769,7 @@ function DataInput({
           <div className="table-wrap">
             <table className="table" style={{ minWidth: 1080 }}>
               <thead>
-                <tr><th>Месяц</th><th>Год</th><th>Вал</th><th>Товарное</th><th>Мастит</th><th>Жир</th><th>Белок</th><th>Выручка</th></tr>
+                <tr><th>Месяц</th><th>Год</th><th>Вал</th><th>Товарное</th><th>Базис</th><th>Мастит</th><th>Жир</th><th>Белок</th><th>Выручка</th></tr>
               </thead>
               <tbody>
                 {historyRowsState.map((item, index) => (
@@ -762,6 +778,7 @@ function DataInput({
                     <MonthCell value={item.year} onChange={(value) => updateHistoryMonth(index, "year", value)} />
                     <MonthCell value={item.gross} onChange={(value) => updateHistoryMonth(index, "gross", value)} />
                     <MonthCell value={item.market} onChange={(value) => updateHistoryMonth(index, "market", value)} />
+                    <td className="num">{fmt(basisKg(item.market, item.fat))}</td>
                     <MonthCell value={item.mastitis} onChange={(value) => updateHistoryMonth(index, "mastitis", value)} />
                     <MonthCell value={item.fat} onChange={(value) => updateHistoryMonth(index, "fat", value)} step="0.01" />
                     <MonthCell value={item.protein} onChange={(value) => updateHistoryMonth(index, "protein", value)} step="0.01" />
@@ -795,6 +812,7 @@ function DeliveryInputTable({
   return (
     <section className="panel">
       <h2 className="panel-title">Куда ушло молоко — {selectedDay.date}</h2>
+      <p className="muted">Базис считается автоматически: фактический кг × жир / {BASE_FAT}. Цена указывается за 1 кг базиса.</p>
       <div className="control-strip">
         <button className="btn btn-primary" type="button" onClick={() => addDeliveryByType("plant")}>+ Добавить завод</button>
         <button className="btn btn-soft" type="button" onClick={() => addDeliveryByType("calves")}>+ Телятам</button>
@@ -802,9 +820,9 @@ function DeliveryInputTable({
         <button className="btn" type="button" onClick={addDelivery}>+ Пустая строка</button>
       </div>
       <div className="table-wrap">
-        <table className="table" style={{ minWidth: 1280 }}>
+        <table className="table" style={{ minWidth: 1420 }}>
           <thead>
-            <tr><th>Дата</th><th>Получатель / завод</th><th>Тип</th><th className="num">Кг</th><th className="num">Жир</th><th className="num">Цена</th><th className="num">Сумма</th><th>Маршрут</th><th>Статус</th><th></th></tr>
+            <tr><th>Дата</th><th>Получатель / завод</th><th>Тип</th><th className="num">Кг факт</th><th className="num">Жир</th><th className="num">Базис, кг</th><th className="num">Цена за базис</th><th className="num">Сумма по базису</th><th>Маршрут</th><th>Статус</th><th></th></tr>
           </thead>
           <tbody>
             {selectedDay.deliveries.map((delivery, index) => (
@@ -814,14 +832,15 @@ function DeliveryInputTable({
                 <td><input className="table-input" value={delivery.product} onChange={(event) => updateDelivery(index, "product", event.target.value)} /></td>
                 <td><input className="table-input num" type="number" value={delivery.liters} onChange={(event) => updateDelivery(index, "liters", event.target.value)} /></td>
                 <td><input className="table-input num" type="number" step="0.01" value={delivery.fat} onChange={(event) => updateDelivery(index, "fat", event.target.value)} /></td>
+                <td className="num">{fmt(basisKg(toNum(delivery.liters), toNum(delivery.fat)))}</td>
                 <td><input className="table-input num" type="number" step="0.01" value={delivery.price} onChange={(event) => updateDelivery(index, "price", event.target.value)} /></td>
-                <td className="num">{fmt(toNum(delivery.liters) * toNum(delivery.price))}</td>
+                <td className="num">{fmt(basisKg(toNum(delivery.liters), toNum(delivery.fat)) * toNum(delivery.price))}</td>
                 <td><input className="table-input" value={delivery.route} onChange={(event) => updateDelivery(index, "route", event.target.value)} /></td>
                 <td><select className="table-input" value={delivery.status} onChange={(event) => updateDelivery(index, "status", event.target.value)}><option>Доставлено</option><option>В пути</option><option>План</option><option>Задержка</option></select></td>
                 <td><button className="btn btn-danger" type="button" onClick={() => removeDelivery(index)}>×</button></td>
               </tr>
             ))}
-            <tr><td colSpan={3}><strong>Итого за день</strong></td><td className="num"><strong>{fmt(selectedDayCalc.deliveriesTotal)}</strong></td><td className="num">—</td><td className="num">—</td><td className="num"><strong>{fmt(selectedDayCalc.revenue)}</strong></td><td colSpan={3}></td></tr>
+            <tr><td colSpan={3}><strong>Итого за день</strong></td><td className="num"><strong>{fmt(selectedDayCalc.deliveriesTotal)}</strong></td><td className="num">—</td><td className="num"><strong>{fmt(selectedDayCalc.deliveriesBasis)}</strong></td><td className="num">—</td><td className="num"><strong>{fmt(selectedDayCalc.revenue)}</strong></td><td colSpan={3}></td></tr>
           </tbody>
         </table>
       </div>
@@ -919,8 +938,9 @@ function Overview({
                   <th>Дата</th>
                   <th>Покупатель</th>
                   <th>Тип</th>
-                  <th className="num">Кол-во</th>
+                  <th className="num">Кг факт</th>
                   <th className="num">Жир</th>
+                  <th className="num">Базис</th>
                   <th className="num">Сумма</th>
                 </tr>
               </thead>
@@ -932,13 +952,15 @@ function Overview({
                     <td>{delivery.product}</td>
                     <td className="num">{fmt(toNum(delivery.liters))}</td>
                     <td className="num">{delivery.fat}</td>
-                    <td className="num">{fmt(toNum(delivery.liters) * toNum(delivery.price))}</td>
+                    <td className="num">{fmt(basisKg(toNum(delivery.liters), toNum(delivery.fat)))}</td>
+                    <td className="num">{fmt(basisKg(toNum(delivery.liters), toNum(delivery.fat)) * toNum(delivery.price))}</td>
                   </tr>
                 ))}
                 <tr>
                   <td colSpan={3}><strong>Итого</strong></td>
                   <td className="num"><strong>{fmt(selectedDayCalc.deliveriesTotal)}</strong></td>
                   <td className="num">—</td>
+                  <td className="num"><strong>{fmt(selectedDayCalc.deliveriesBasis)}</strong></td>
                   <td className="num"><strong>{fmt(selectedDayCalc.revenue)}</strong></td>
                 </tr>
               </tbody>
@@ -964,8 +986,9 @@ function Overview({
           <h2 className="panel-title">Контроль дня</h2>
           <div className="driver-grid" style={{ gridTemplateColumns: "1fr" }}>
             <MiniStat title="Вал за день" value={`${fmt(selectedDayCalc.gross)} кг`} note="танк + мастит" />
-            <MiniStat title="Распределено" value={`${fmt(selectedDayCalc.deliveriesTotal)} кг`} note={`разница: ${fmt(selectedDayCalc.notDistributed)} кг`} />
-            <MiniStat title="Выручка за день" value={`${fmt(selectedDayCalc.revenue)} ₸`} note="по всем заводам" />
+            <MiniStat title="Базис за день" value={`${fmt(selectedDayCalc.basis)} кг`} note={`жир / ${BASE_FAT}`} />
+            <MiniStat title="Распределено" value={`${fmt(selectedDayCalc.deliveriesTotal)} кг`} note={`базис: ${fmt(selectedDayCalc.deliveriesBasis)} кг`} />
+            <MiniStat title="Выручка за день" value={`${fmt(selectedDayCalc.revenue)} ₸`} note="по базису" />
           </div>
         </div>
       </section>
@@ -1107,7 +1130,7 @@ function Plants({
         <Kpi icon="👥" title="Активных покупателей" value={`${grouped.length}`} note="+1 к апрелю" />
         <Kpi icon="🚛" title="Всего распределено" value={`${fmt(selectedDayCalc.deliveriesTotal)} кг`} note="за выбранный день" />
         <Kpi icon="₸" title="Средняя цена" value={`${fmt(avg(deliveries.filter((i) => toNum(i.price) > 0).map((i) => toNum(i.price))), 2)} ₸`} note="за литр" />
-        <Kpi icon="▣" title="Выручка дня" value={`${fmt(selectedDayCalc.revenue)} ₸`} note="по всем направлениям" />
+        <Kpi icon="₸" title="Выручка дня" value={`${fmt(selectedDayCalc.revenue)} ₸`} note="по базису" />
         <Kpi icon="★" title="Лучший покупатель" value={grouped[0]?.buyer ?? "—"} note={`${fmt(grouped[0]?.liters ?? 0)} кг`} />
         <Kpi icon="!" title="Контроль оплаты" value={`${fmt(debtRows.reduce((s, r) => s + r.debt, 0))} ₸`} note="условная задолженность" />
       </section>
@@ -1276,6 +1299,7 @@ function Forecast({ allMonths, monthFact }: { allMonths: MonthFact[]; monthFact:
             <Driver title="Кормление NDF" value="31,5%" note="в норме" />
             <Driver title="Средний удой" value={`${fmt(monthFact.avgMilk, 1)}`} note="кг/гол/день" />
             <Driver title="Товарность" value={`${pct(monthFact.market / Math.max(monthFact.gross, 1) * 100)}`} note="+0,3 п.п." />
+            <Driver title="Базисное молоко" value={`${fmt(basisKg(monthFact.market, 3.9))}`} note={`расчёт через ${BASE_FAT}%`} />
           </div>
         </div>
 
@@ -1346,7 +1370,8 @@ function groupDeliveries(deliveries: Delivery[]) {
 
   for (const delivery of deliveries) {
     const liters = toNum(delivery.liters);
-    const revenue = liters * toNum(delivery.price);
+    const basis = basisKg(liters, toNum(delivery.fat));
+    const revenue = basis * toNum(delivery.price);
     const current = map.get(delivery.buyer) ?? { buyer: delivery.buyer || "Без покупателя", liters: 0, revenue: 0, count: 0 };
     current.liters += liters;
     current.revenue += revenue;
@@ -1410,7 +1435,7 @@ function MonthTable({ rows }: { rows: MonthFact[] }) {
   return (
     <div className="table-wrap">
       <table className="table">
-        <thead><tr><th>Месяц</th><th className="num">Вал</th><th className="num">Товарное</th><th className="num">% мастита</th><th className="num">Жир</th><th className="num">Белок</th><th className="num">Выручка</th></tr></thead>
+        <thead><tr><th>Месяц</th><th className="num">Вал</th><th className="num">Товарное</th><th className="num">Базис</th><th className="num">% мастита</th><th className="num">Жир</th><th className="num">Белок</th><th className="num">Выручка</th></tr></thead>
         <tbody>
           {rows.map((row) => (
             <tr key={`${row.month}-${row.year}`}>
