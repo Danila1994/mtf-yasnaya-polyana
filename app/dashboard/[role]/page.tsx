@@ -11,14 +11,14 @@ const ROLE_NAMES: Record<string, string> = {
 };
 
 const MODULES = [
-  { title: "Пользователи и роли", text: "Добавление сотрудников, выдача прав доступа", roles: ["admin"] },
-  { title: "Ежедневный отчет МТФ", text: "Надой, поголовье, падёж, комментарии за день", roles: ["admin", "director", "brigadir", "view"] },
-  { title: "Журнал лечения", text: "Диагнозы, статусы, исходы, контроль случаев", roles: ["admin", "director", "vet", "view"] },
-  { title: "Осеменение", text: "Ввод осеменений, семя, быки, исполнитель", roles: ["admin", "director", "osem", "view"] },
-  { title: "Отёлы и телята", text: "Отёлы, приплод, молозиво, первичный контроль", roles: ["admin", "director", "vet", "telyatnica", "view"] },
-  { title: "Корма и остатки", text: "Приход, расход, остатки кормов и добавок", roles: ["admin", "director", "brigadir", "view"] },
-  { title: "Отчеты руководства", text: "День, неделя, месяц, фильтры и экспорт", roles: ["admin", "director", "view"] },
-  { title: "История изменений", text: "Кто, когда и что изменил", roles: ["admin", "director"] }
+  { title: "Пользователи и роли", text: "Добавление сотрудников, выдача прав доступа", href: "#", roles: ["admin"] },
+  { title: "Ежедневная сводка МТФ", text: "Молоко/головы, ветеринария/осеменение, корма за день", href: "/dashboard/daily-summary", roles: ["admin", "director", "brigadir", "vet", "osem", "view"] },
+  { title: "Журнал лечения", text: "Диагнозы, статусы, исходы, контроль случаев", href: "#", roles: ["admin", "director", "vet", "view"] },
+  { title: "Осеменение", text: "Ввод осеменений, семя, быки, исполнитель", href: "#", roles: ["admin", "director", "osem", "view"] },
+  { title: "Отёлы и телята", text: "Отёлы, приплод, молозиво, первичный контроль", href: "#", roles: ["admin", "director", "vet", "telyatnica", "view"] },
+  { title: "Корма и остатки", text: "Приход, расход, остатки кормов и добавок", href: "#", roles: ["admin", "director", "brigadir", "view"] },
+  { title: "Отчеты руководства", text: "День, неделя, месяц, фильтры и экспорт", href: "/demo", roles: ["admin", "director", "view"] },
+  { title: "История изменений", text: "Кто, когда и что изменил", href: "#", roles: ["admin", "director"] }
 ];
 
 const RESTRICTIONS: Record<string, string[]> = {
@@ -73,10 +73,10 @@ export default async function DashboardRolePage({ params }: PageProps) {
           <h2>Рабочий кабинет</h2>
           <div className="module-grid">
             {visibleModules.map((module) => (
-              <div className="module" key={module.title}>
+              <Link className="module module-link" href={module.href} key={module.title}>
                 <strong>{module.title}</strong>
                 <span>{module.text}</span>
-              </div>
+              </Link>
             ))}
           </div>
 
