@@ -28,6 +28,8 @@ type DayMilk = {
   carFat: number;
   deliveries: Delivery[];
   comment?: string;
+  status?: "Черновик" | "Проверено" | "Закрыто";
+  recorder?: string;
 };
 
 type MonthFact = {
@@ -41,7 +43,7 @@ type MonthFact = {
   revenue: number;
 };
 
-type Tab = "overview" | "archive" | "plants" | "forecast";
+type Tab = "input" | "overview" | "archive" | "plants" | "forecast";
 
 const LOGIN_KEY = "mtf-auth";
 const MONTHS = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
@@ -117,6 +119,8 @@ function day(
 
   return {
     date,
+    status: "Проверено",
+    recorder: "учетчик",
     elHeads,
     elTank,
     elMastitis,
@@ -142,6 +146,8 @@ function day(
 function emptyDay(date: string): DayMilk {
   return {
     date,
+    status: "Черновик",
+    recorder: "",
     elHeads: 0,
     elTank: 0,
     elMastitis: 0,
@@ -203,15 +209,20 @@ function monthIndex(month: string) {
 }
 
 function storageKey() {
-  return "mtf-v62-milk-days";
+  return "mtf-v63-milk-days";
+}
+
+function historyStorageKey() {
+  return "mtf-v63-milk-history";
 }
 
 export default function MilkPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>("input");
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [days, setDays] = useState<DayMilk[]>(seedDays);
+  const [historyRowsState, setHistoryRowsState] = useState<MonthFact[]>(historicalRows);
   const [savedAt, setSavedAt] = useState("");
 
   useEffect(() => {
@@ -232,6 +243,11 @@ export default function MilkPage() {
           setDays(parsed.days);
           setSavedAt(parsed.savedAt ?? "");
         }
+      }
+      const rawHistory = window.localStorage.getItem(historyStorageKey());
+      if (rawHistory) {
+        const parsedHistory = JSON.parse(rawHistory) as MonthFact[];
+        if (parsedHistory.length) setHistoryRowsState(parsedHistory);
       }
     } catch {}
   }, []);
@@ -269,8 +285,8 @@ export default function MilkPage() {
       revenue: monthFact.revenue || 72345860,
     };
 
-    return [...historicalRows, may2026];
-  }, [monthFact]);
+    return [...historyRowsState.filter((row) => !(row.year === 2026 && row.month === "Май")), may2026];
+  }, [monthFact, historyRowsState]);
 
   const selectedDay = days[selectedDayIndex] ?? days[0] ?? emptyDay("2026-05-01");
   const selectedDayCalc = calcDay(selectedDay);
@@ -280,15 +296,18 @@ export default function MilkPage() {
     setSavedAt(stamp);
     try {
       window.localStorage.setItem(storageKey(), JSON.stringify({ days, savedAt: stamp }));
+      window.localStorage.setItem(historyStorageKey(), JSON.stringify(historyRowsState));
     } catch {}
   }
 
   function reset() {
     setDays(seedDays);
+    setHistoryRowsState(historicalRows);
     setSelectedDayIndex(0);
     setSavedAt("");
     try {
       window.localStorage.removeItem(storageKey());
+      window.localStorage.removeItem(historyStorageKey());
     } catch {}
   }
 
@@ -340,6 +359,79 @@ export default function MilkPage() {
     }));
   }
 
+  function addDeliveryByType(type: "plant" | "calves" | "loss") {
+    setDays((current) => current.map((dayItem, dayIndex) => {
+      if (dayIndex !== selectedDayIndex) return dayItem;
+      const calc = calcDay(dayItem);
+      const base: Delivery = {
+        id: `${dayItem.date}-${Date.now()}`,
+        date: dayItem.date,
+        buyer: type === "calves" ? "Телятам" : type === "loss" ? "Брак / слив" : "",
+        product: type === "loss" ? "Потери" : type === "calves" ? "Молоко" : "Товарное молоко",
+        liters: "",
+        fat: calc.fat ? String(calc.fat.toFixed(2)) : "",
+        price: "",
+        status: type === "loss" ? "Задержка" : type === "calves" ? "Доставлено" : "План",
+        route: type === "calves" ? "Ферма → телятник" : "",
+      };
+      return { ...dayItem, deliveries: [...dayItem.deliveries, base] };
+    }));
+  }
+
+  function updateDayNumber(field: keyof DayMilk, value: string) {
+    setDays((current) => current.map((dayItem, dayIndex) => {
+      if (dayIndex !== selectedDayIndex) return dayItem;
+      return { ...dayItem, [field]: Number(value) || 0 };
+    }));
+  }
+
+  function updateDayText(field: keyof DayMilk, value: string) {
+    setDays((current) => current.map((dayItem, dayIndex) => {
+      if (dayIndex !== selectedDayIndex) return dayItem;
+      return { ...dayItem, [field]: value };
+    }));
+  }
+
+  function addNewDay(date: string) {
+    if (!date) return;
+    const existing = days.findIndex((item) => item.date === date);
+    if (existing >= 0) {
+      setSelectedDayIndex(existing);
+      return;
+    }
+    const next = [...days, emptyDay(date)].sort((a, b) => a.date.localeCompare(b.date));
+    setDays(next);
+    setSelectedDayIndex(next.findIndex((item) => item.date === date));
+  }
+
+  function updateAnyDay(index: number, field: keyof DayMilk, value: string) {
+    setDays((current) => current.map((dayItem, dayIndex) => {
+      if (dayIndex !== index) return dayItem;
+      return { ...dayItem, [field]: Number(value) || 0 };
+    }));
+  }
+
+  function addHistoryMonth() {
+    setHistoryRowsState((current) => [...current, {
+      month: "Май",
+      year: 2026,
+      gross: 0,
+      market: 0,
+      mastitis: 0,
+      fat: 0,
+      protein: 0,
+      revenue: 0,
+    }]);
+  }
+
+  function updateHistoryMonth(index: number, field: keyof MonthFact, value: string) {
+    setHistoryRowsState((current) => current.map((item, itemIndex) => {
+      if (itemIndex !== index) return item;
+      if (field === "month") return { ...item, month: value };
+      return { ...item, [field]: Number(value) || 0 };
+    }));
+  }
+
   if (!ready) {
     return <main className="page">Проверка доступа...</main>;
   }
@@ -353,7 +445,7 @@ export default function MilkPage() {
             <div>
               <h1 className="title">Молоко</h1>
               <p className="subtitle">
-                Расширенный модуль: надой, товарность, заводы, реализация, архив, статистика и прогноз.
+                Расширенный модуль: ввод данных, надой, товарность, заводы, реализация, архив, статистика и прогноз.
               </p>
             </div>
             <div className="actions">
@@ -366,6 +458,7 @@ export default function MilkPage() {
           </header>
 
           <div className="tabs">
+            <button className={tab === "input" ? "tab active" : "tab"} onClick={() => setTab("input")}>Ввод данных</button>
             <button className={tab === "overview" ? "tab active" : "tab"} onClick={() => setTab("overview")}>Обзор</button>
             <button className={tab === "archive" ? "tab active" : "tab"} onClick={() => setTab("archive")}>Архив и статистика</button>
             <button className={tab === "plants" ? "tab active" : "tab"} onClick={() => setTab("plants")}>Заводы и реализация</button>
@@ -373,6 +466,28 @@ export default function MilkPage() {
           </div>
 
           {savedAt ? <p className="muted">Последнее сохранение: {savedAt}</p> : null}
+
+          {tab === "input" ? (
+            <DataInput
+              days={days}
+              selectedDay={selectedDay}
+              selectedDayIndex={selectedDayIndex}
+              setSelectedDayIndex={setSelectedDayIndex}
+              selectedDayCalc={selectedDayCalc}
+              updateDayNumber={updateDayNumber}
+              updateDayText={updateDayText}
+              updateDelivery={updateDelivery}
+              addDelivery={addDelivery}
+              addDeliveryByType={addDeliveryByType}
+              removeDelivery={removeDelivery}
+              addNewDay={addNewDay}
+              updateAnyDay={updateAnyDay}
+              historyRowsState={historyRowsState}
+              addHistoryMonth={addHistoryMonth}
+              updateHistoryMonth={updateHistoryMonth}
+              save={save}
+            />
+          ) : null}
 
           {tab === "overview" ? (
             <Overview
@@ -440,6 +555,287 @@ function Sidebar() {
       </div>
     </aside>
   );
+}
+
+
+function DataInput({
+  days,
+  selectedDay,
+  selectedDayIndex,
+  setSelectedDayIndex,
+  selectedDayCalc,
+  updateDayNumber,
+  updateDayText,
+  updateDelivery,
+  addDelivery,
+  addDeliveryByType,
+  removeDelivery,
+  addNewDay,
+  updateAnyDay,
+  historyRowsState,
+  addHistoryMonth,
+  updateHistoryMonth,
+  save,
+}: {
+  days: DayMilk[];
+  selectedDay: DayMilk;
+  selectedDayIndex: number;
+  setSelectedDayIndex: (index: number) => void;
+  selectedDayCalc: ReturnType<typeof calcDay>;
+  updateDayNumber: (field: keyof DayMilk, value: string) => void;
+  updateDayText: (field: keyof DayMilk, value: string) => void;
+  updateDelivery: (index: number, field: keyof Delivery, value: string) => void;
+  addDelivery: () => void;
+  addDeliveryByType: (type: "plant" | "calves" | "loss") => void;
+  removeDelivery: (index: number) => void;
+  addNewDay: (date: string) => void;
+  updateAnyDay: (index: number, field: keyof DayMilk, value: string) => void;
+  historyRowsState: MonthFact[];
+  addHistoryMonth: () => void;
+  updateHistoryMonth: (index: number, field: keyof MonthFact, value: string) => void;
+  save: () => void;
+}) {
+  const [mode, setMode] = useState<"current" | "days" | "months">("current");
+  const [newDate, setNewDate] = useState(selectedDay.date);
+  const diffClass = selectedDayCalc.diffPct <= 1 ? "panel status-good" : selectedDayCalc.diffPct <= 3 ? "panel status-warn" : "panel status-bad";
+
+  return (
+    <>
+      <section className="panel">
+        <h2 className="panel-title">Ввод данных</h2>
+        <div className="control-strip">
+          <button className={mode === "current" ? "btn btn-primary" : "btn"} type="button" onClick={() => setMode("current")}>Текущий день</button>
+          <button className={mode === "days" ? "btn btn-primary" : "btn"} type="button" onClick={() => setMode("days")}>История по дням</button>
+          <button className={mode === "months" ? "btn btn-primary" : "btn"} type="button" onClick={() => setMode("months")}>История по месяцам</button>
+        </div>
+        <p className="muted" style={{ marginBottom: 0 }}>
+          Это рабочее место учетчика: сначала заносим данные, потом отчёты строятся автоматически.
+        </p>
+      </section>
+
+      {mode === "current" ? (
+        <>
+          <section className="grid-side">
+            <div className="panel">
+              <h2 className="panel-title">Дата, статус и ответственный</h2>
+              <div className="form-grid">
+                <div className="field">
+                  <label>Выбрать дату</label>
+                  <select className="select" value={selectedDayIndex} onChange={(event) => setSelectedDayIndex(Number(event.target.value))}>
+                    {days.map((dayItem, index) => <option key={dayItem.date} value={index}>{dayItem.date}</option>)}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Добавить дату</label>
+                  <input className="input" type="date" value={newDate} onChange={(event) => setNewDate(event.target.value)} />
+                </div>
+                <div className="field">
+                  <label>Открыть / создать</label>
+                  <button className="btn btn-primary" type="button" onClick={() => addNewDay(newDate)}>Добавить дату</button>
+                </div>
+                <div className="field">
+                  <label>Статус дня</label>
+                  <select className="select" value={selectedDay.status ?? "Черновик"} onChange={(event) => updateDayText("status", event.target.value)}>
+                    <option>Черновик</option>
+                    <option>Проверено</option>
+                    <option>Закрыто</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Кто внёс</label>
+                  <input className="input" value={selectedDay.recorder ?? ""} onChange={(event) => updateDayText("recorder", event.target.value)} />
+                </div>
+                <div className="field">
+                  <label>Сохранение</label>
+                  <button className="btn btn-soft" type="button" onClick={save}>Сохранить день</button>
+                </div>
+              </div>
+            </div>
+
+            <div className={diffClass}>
+              <h2 className="panel-title">Контроль расхождения</h2>
+              <div className="driver-grid" style={{ gridTemplateColumns: "1fr" }}>
+                <MiniStat title="Товарное по доению" value={`${fmt(selectedDayCalc.market)} кг`} note="Ёлочка + Карусель" />
+                <MiniStat title="Распределено" value={`${fmt(selectedDayCalc.deliveriesTotal)} кг`} note="заводы, телята, прочее" />
+                <MiniStat title="Разница" value={`${fmt(selectedDayCalc.notDistributed)} кг`} note={`${fmt(selectedDayCalc.diffPct, 2)}% от товарного`} />
+              </div>
+            </div>
+          </section>
+
+          <section className="grid-2">
+            <div className="panel">
+              <h2 className="panel-title">Надой за день — {selectedDay.date}</h2>
+              <div className="grid-2">
+                <div>
+                  <h3>Ёлочка</h3>
+                  <div className="form-grid-2">
+                    <NumberField label="Голов" value={selectedDay.elHeads} onChange={(value) => updateDayNumber("elHeads", value)} />
+                    <NumberField label="Танк, кг" value={selectedDay.elTank} onChange={(value) => updateDayNumber("elTank", value)} />
+                    <NumberField label="Мастит, кг" value={selectedDay.elMastitis} onChange={(value) => updateDayNumber("elMastitis", value)} />
+                    <NumberField label="Жир, %" value={selectedDay.elFat} onChange={(value) => updateDayNumber("elFat", value)} step="0.01" />
+                  </div>
+                </div>
+                <div>
+                  <h3>Карусель</h3>
+                  <div className="form-grid-2">
+                    <NumberField label="Голов" value={selectedDay.carHeads} onChange={(value) => updateDayNumber("carHeads", value)} />
+                    <NumberField label="Танк, кг" value={selectedDay.carTank} onChange={(value) => updateDayNumber("carTank", value)} />
+                    <NumberField label="Мастит, кг" value={selectedDay.carMastitis} onChange={(value) => updateDayNumber("carMastitis", value)} />
+                    <NumberField label="Жир, %" value={selectedDay.carFat} onChange={(value) => updateDayNumber("carFat", value)} step="0.01" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="panel">
+              <h2 className="panel-title">Итог дня</h2>
+              <div className="driver-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                <MiniStat title="Вал" value={`${fmt(selectedDayCalc.gross)} кг`} note="танк + мастит" />
+                <MiniStat title="Товарное" value={`${fmt(selectedDayCalc.market)} кг`} note="по доению" />
+                <MiniStat title="Мастит" value={`${fmt(selectedDayCalc.mastitis)} кг`} note={pct(selectedDayCalc.mastitisPct, 2)} />
+                <MiniStat title="Средний удой" value={`${fmt(selectedDayCalc.avg, 1)} кг`} note="на голову" />
+              </div>
+            </div>
+          </section>
+
+          <DeliveryInputTable
+            selectedDay={selectedDay}
+            selectedDayCalc={selectedDayCalc}
+            updateDelivery={updateDelivery}
+            addDelivery={addDelivery}
+            addDeliveryByType={addDeliveryByType}
+            removeDelivery={removeDelivery}
+          />
+
+          <section className="panel">
+            <h2 className="panel-title">Комментарий</h2>
+            <textarea className="textarea" value={selectedDay.comment ?? ""} onChange={(event) => updateDayText("comment", event.target.value)} />
+          </section>
+        </>
+      ) : null}
+
+      {mode === "days" ? (
+        <section className="panel">
+          <h2 className="panel-title">Быстрый ввод истории по дням</h2>
+          <p className="muted">Для старых данных можно занести дни таблицей. Подробные заводы можно открыть через режим текущего дня.</p>
+          <div className="table-wrap">
+            <table className="table" style={{ minWidth: 1200 }}>
+              <thead>
+                <tr><th>Дата</th><th>Голов ёлочка</th><th>Танк ёлочка</th><th>Мастит ёлочка</th><th>Голов карусель</th><th>Танк карусель</th><th>Мастит карусель</th><th>Жир ёлочка</th><th>Жир карусель</th></tr>
+              </thead>
+              <tbody>
+                {days.map((dayItem, index) => (
+                  <tr key={dayItem.date}>
+                    <td>{dayItem.date}</td>
+                    <HistoryCell value={dayItem.elHeads} onChange={(value) => updateAnyDay(index, "elHeads", value)} />
+                    <HistoryCell value={dayItem.elTank} onChange={(value) => updateAnyDay(index, "elTank", value)} />
+                    <HistoryCell value={dayItem.elMastitis} onChange={(value) => updateAnyDay(index, "elMastitis", value)} />
+                    <HistoryCell value={dayItem.carHeads} onChange={(value) => updateAnyDay(index, "carHeads", value)} />
+                    <HistoryCell value={dayItem.carTank} onChange={(value) => updateAnyDay(index, "carTank", value)} />
+                    <HistoryCell value={dayItem.carMastitis} onChange={(value) => updateAnyDay(index, "carMastitis", value)} />
+                    <HistoryCell value={dayItem.elFat} onChange={(value) => updateAnyDay(index, "elFat", value)} step="0.01" />
+                    <HistoryCell value={dayItem.carFat} onChange={(value) => updateAnyDay(index, "carFat", value)} step="0.01" />
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {mode === "months" ? (
+        <section className="panel">
+          <h2 className="panel-title">Быстрый ввод истории по месяцам <button className="btn btn-primary" type="button" onClick={addHistoryMonth}>Добавить месяц</button></h2>
+          <p className="muted">Когда нет подробных данных по дням, заносим месячный итог. Он пойдёт в архив, сравнение годов и прогноз.</p>
+          <div className="table-wrap">
+            <table className="table" style={{ minWidth: 1080 }}>
+              <thead>
+                <tr><th>Месяц</th><th>Год</th><th>Вал</th><th>Товарное</th><th>Мастит</th><th>Жир</th><th>Белок</th><th>Выручка</th></tr>
+              </thead>
+              <tbody>
+                {historyRowsState.map((item, index) => (
+                  <tr key={`${item.year}-${item.month}-${index}`}>
+                    <td><select className="table-input" value={item.month} onChange={(event) => updateHistoryMonth(index, "month", event.target.value)}>{MONTHS.map((month) => <option key={month}>{month}</option>)}</select></td>
+                    <MonthCell value={item.year} onChange={(value) => updateHistoryMonth(index, "year", value)} />
+                    <MonthCell value={item.gross} onChange={(value) => updateHistoryMonth(index, "gross", value)} />
+                    <MonthCell value={item.market} onChange={(value) => updateHistoryMonth(index, "market", value)} />
+                    <MonthCell value={item.mastitis} onChange={(value) => updateHistoryMonth(index, "mastitis", value)} />
+                    <MonthCell value={item.fat} onChange={(value) => updateHistoryMonth(index, "fat", value)} step="0.01" />
+                    <MonthCell value={item.protein} onChange={(value) => updateHistoryMonth(index, "protein", value)} step="0.01" />
+                    <MonthCell value={item.revenue} onChange={(value) => updateHistoryMonth(index, "revenue", value)} />
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+    </>
+  );
+}
+
+function DeliveryInputTable({
+  selectedDay,
+  selectedDayCalc,
+  updateDelivery,
+  addDelivery,
+  addDeliveryByType,
+  removeDelivery,
+}: {
+  selectedDay: DayMilk;
+  selectedDayCalc: ReturnType<typeof calcDay>;
+  updateDelivery: (index: number, field: keyof Delivery, value: string) => void;
+  addDelivery: () => void;
+  addDeliveryByType: (type: "plant" | "calves" | "loss") => void;
+  removeDelivery: (index: number) => void;
+}) {
+  return (
+    <section className="panel">
+      <h2 className="panel-title">Куда ушло молоко — {selectedDay.date}</h2>
+      <div className="control-strip">
+        <button className="btn btn-primary" type="button" onClick={() => addDeliveryByType("plant")}>+ Добавить завод</button>
+        <button className="btn btn-soft" type="button" onClick={() => addDeliveryByType("calves")}>+ Телятам</button>
+        <button className="btn btn-soft" type="button" onClick={() => addDeliveryByType("loss")}>+ Потери</button>
+        <button className="btn" type="button" onClick={addDelivery}>+ Пустая строка</button>
+      </div>
+      <div className="table-wrap">
+        <table className="table" style={{ minWidth: 1280 }}>
+          <thead>
+            <tr><th>Дата</th><th>Получатель / завод</th><th>Тип</th><th className="num">Кг</th><th className="num">Жир</th><th className="num">Цена</th><th className="num">Сумма</th><th>Маршрут</th><th>Статус</th><th></th></tr>
+          </thead>
+          <tbody>
+            {selectedDay.deliveries.map((delivery, index) => (
+              <tr key={delivery.id}>
+                <td>{delivery.date}</td>
+                <td><input className="table-input" value={delivery.buyer} onChange={(event) => updateDelivery(index, "buyer", event.target.value)} /></td>
+                <td><input className="table-input" value={delivery.product} onChange={(event) => updateDelivery(index, "product", event.target.value)} /></td>
+                <td><input className="table-input num" type="number" value={delivery.liters} onChange={(event) => updateDelivery(index, "liters", event.target.value)} /></td>
+                <td><input className="table-input num" type="number" step="0.01" value={delivery.fat} onChange={(event) => updateDelivery(index, "fat", event.target.value)} /></td>
+                <td><input className="table-input num" type="number" step="0.01" value={delivery.price} onChange={(event) => updateDelivery(index, "price", event.target.value)} /></td>
+                <td className="num">{fmt(toNum(delivery.liters) * toNum(delivery.price))}</td>
+                <td><input className="table-input" value={delivery.route} onChange={(event) => updateDelivery(index, "route", event.target.value)} /></td>
+                <td><select className="table-input" value={delivery.status} onChange={(event) => updateDelivery(index, "status", event.target.value)}><option>Доставлено</option><option>В пути</option><option>План</option><option>Задержка</option></select></td>
+                <td><button className="btn btn-danger" type="button" onClick={() => removeDelivery(index)}>×</button></td>
+              </tr>
+            ))}
+            <tr><td colSpan={3}><strong>Итого за день</strong></td><td className="num"><strong>{fmt(selectedDayCalc.deliveriesTotal)}</strong></td><td className="num">—</td><td className="num">—</td><td className="num"><strong>{fmt(selectedDayCalc.revenue)}</strong></td><td colSpan={3}></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function NumberField({ label, value, onChange, step = "1" }: { label: string; value: number; onChange: (value: string) => void; step?: string }) {
+  return <div className="field"><label>{label}</label><input className="input" type="number" step={step} value={value} onChange={(event) => onChange(event.target.value)} /></div>;
+}
+
+function HistoryCell({ value, onChange, step = "1" }: { value: number; onChange: (value: string) => void; step?: string }) {
+  return <td><input className="table-input num" type="number" step={step} value={value} onChange={(event) => onChange(event.target.value)} /></td>;
+}
+
+function MonthCell({ value, onChange, step = "1" }: { value: number; onChange: (value: string) => void; step?: string }) {
+  return <td><input className="table-input num" type="number" step={step} value={value} onChange={(event) => onChange(event.target.value)} /></td>;
 }
 
 function Overview({
