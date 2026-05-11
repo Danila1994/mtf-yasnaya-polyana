@@ -36,7 +36,7 @@ export default function LoginPage() {
         <div className="logo-mark">ЯП</div>
         <h1 className="login-title">МТФ Ясная Поляна</h1>
         <p className="login-subtitle">
-          Вход в рабочую систему отчётности. Сейчас доступ открыт только для пользователя Danila.
+          Рабочая система отчётности и аналитики фермы.
         </p>
 
         <div className="form-stack">
@@ -47,7 +47,6 @@ export default function LoginPage() {
               className="input"
               value={login}
               onChange={(event) => setLogin(event.target.value)}
-              placeholder="Danila"
               autoComplete="username"
             />
           </div>
@@ -60,7 +59,6 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="000000"
               autoComplete="current-password"
             />
           </div>

@@ -28,42 +28,83 @@ export default function DashboardPage() {
 
   return (
     <main className="page">
-      <header className="topbar">
-        <div className="brand-row">
-          <div className="brand-mark">ЯП</div>
-          <div>
-            <div className="eyebrow">Рабочий кабинет</div>
-            <h1 className="title">МТФ Ясная Поляна</h1>
+      <div className="shell">
+        <Sidebar active="home" />
+        <section className="main">
+          <header className="topbar">
+            <div>
+              <h1 className="title">МТФ Ясная Поляна</h1>
+              <p className="subtitle">
+                Главный экран. Сейчас рабочим сделан модуль молока. Остальные разделы заложены под расширение.
+              </p>
+            </div>
+            <div className="actions">
+              <button className="btn" onClick={logout} type="button">
+                Выйти
+              </button>
+            </div>
+          </header>
+
+          <div className="grid-3">
+            <Link className="panel" href="/dashboard/milk" style={{ textDecoration: "none" }}>
+              <h2 className="panel-title">Молоко</h2>
+              <p className="muted">
+                Надой, товарное молоко, мастит, жирность, заводы, реализация, архив и прогноз.
+              </p>
+              <div className="btn btn-primary" style={{ marginTop: 14 }}>
+                Открыть модуль
+              </div>
+            </Link>
+
+            <div className="panel">
+              <h2 className="panel-title">Воспроизводство</h2>
+              <p className="muted">Раздел заложен под следующий этап. Будут KPI, осеменения, стельность, прогноз отёлов.</p>
+            </div>
+
+            <div className="panel">
+              <h2 className="panel-title">Ветеринария</h2>
+              <p className="muted">Раздел заложен под следующий этап. Будут лечение, мастит, хромота, расходы, журналы.</p>
+            </div>
           </div>
-        </div>
-
-        <div className="header-actions">
-          <button className="btn" onClick={logout} type="button">
-            Выйти
-          </button>
-        </div>
-      </header>
-
-      <div className="container">
-        <section className="hero">
-          <h2>Начальный экран</h2>
-          <p>
-            Здесь оставлен только основной рабочий раздел. Без лишних ссылок и лишних страниц:
-            сначала заходим в молоко, затем выбираем сводку или расширенный отчёт.
-          </p>
-        </section>
-
-        <section className="module-grid">
-          <Link className="module-card" href="/dashboard/milk">
-            <div className="module-icon">М</div>
-            <strong>Молоко</strong>
-            <span>
-              Сводка за день, расширенная таблица, сравнение по месяцам и годам,
-              графики, мастит, жирность и куда продали молоко.
-            </span>
-          </Link>
         </section>
       </div>
     </main>
+  );
+}
+
+function Sidebar({ active }: { active: "home" | "milk" }) {
+  return (
+    <aside className="sidebar">
+      <div className="brand">
+        <div className="brand-logo">ЯП</div>
+        <div>
+          <strong>МТФ</strong>
+          <span>Ясная Поляна</span>
+        </div>
+      </div>
+
+      <nav className="nav">
+        <Link className={active === "home" ? "nav-link active" : "nav-link"} href="/dashboard">
+          <span className="nav-icon">⌂</span>Главная
+        </Link>
+        <Link className={active === "milk" ? "nav-link active" : "nav-link"} href="/dashboard/milk">
+          <span className="nav-icon">▣</span>Молоко
+        </Link>
+        <div className="nav-link"><span className="nav-icon">◎</span>Воспроизводство</div>
+        <div className="nav-link"><span className="nav-icon">✚</span>Ветеринария</div>
+        <div className="nav-link"><span className="nav-icon">⌬</span>Корма</div>
+        <div className="nav-link"><span className="nav-icon">₸</span>Финансы</div>
+        <div className="nav-link"><span className="nav-icon">▤</span>Архив</div>
+        <div className="nav-link"><span className="nav-icon">⚙</span>Настройки</div>
+      </nav>
+
+      <div className="user-card">
+        <div className="avatar" />
+        <div>
+          <strong>Данила Г.</strong>
+          <span>Руководитель</span>
+        </div>
+      </div>
+    </aside>
   );
 }

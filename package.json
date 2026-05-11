@@ -1,6 +1,6 @@
 {
-  "name": "mtf-yasnaya-polyana-site-v6",
-  "version": "6.0.0",
+  "name": "mtf-yasnaya-polyana-site-v6-2",
+  "version": "6.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
