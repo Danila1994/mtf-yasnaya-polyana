@@ -1,20 +1,21 @@
 {
   "name": "mtf-yasnaya-polyana-site",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0",
+    "dev": "next dev",
     "build": "next build",
-    "start": "next start -H 0.0.0.0"
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
-    "@types/node": "^20.19.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "next": "^16.0.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "typescript": "^5.9.0"
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "next": "^15.1.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.7.2"
   },
   "devDependencies": {}
 }
