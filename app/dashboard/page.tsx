@@ -1,43 +1,69 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-const ROLES = [
-  ["admin", "Администратор"],
-  ["director", "Руководитель"],
-  ["vet", "Ветврач"],
-  ["osem", "Осеменатор"],
-  ["brigadir", "Бригадир"],
-  ["telyatnica", "Телятница"],
-  ["view", "Только просмотр"]
-];
+export default function DashboardPage() {
+  const router = useRouter();
+  const [ready, setReady] = useState(false);
 
-export default function DashboardIndexPage() {
+  useEffect(() => {
+    if (window.localStorage.getItem("mtf-auth") !== "yes") {
+      router.replace("/");
+      return;
+    }
+
+    setReady(true);
+  }, [router]);
+
+  function logout() {
+    window.localStorage.removeItem("mtf-auth");
+    router.replace("/");
+  }
+
+  if (!ready) {
+    return <main className="page">Проверка доступа...</main>;
+  }
+
   return (
     <main className="page">
-      <header className="header">
-        <Link className="brand" href="/">
-          <div className="logo">ЯП</div>
+      <header className="topbar">
+        <div className="brand-row">
+          <div className="brand-mark">ЯП</div>
           <div>
-            <small>Кабинет пользователя</small>
-            <strong>МТФ «Ясная Поляна»</strong>
-          </div>
-        </Link>
-        <Link className="btn" href="/login">Назад ко входу</Link>
-      </header>
-
-      <section className="center-wrap">
-        <div className="card wide-card">
-          <h2>Выберите тестовую роль</h2>
-          <p>Пока авторизация тестовая. Выберите роль, чтобы проверить доступные разделы.</p>
-          <div className="role-login-grid">
-            {ROLES.map(([role, title]) => (
-              <Link className="role-login-card" href={`/dashboard/${role}`} key={role}>
-                <strong>{title}</strong>
-                <span>Открыть кабинет</span>
-              </Link>
-            ))}
+            <div className="eyebrow">Рабочий кабинет</div>
+            <h1 className="title">МТФ Ясная Поляна</h1>
           </div>
         </div>
-      </section>
+
+        <div className="header-actions">
+          <button className="btn" onClick={logout} type="button">
+            Выйти
+          </button>
+        </div>
+      </header>
+
+      <div className="container">
+        <section className="hero">
+          <h2>Начальный экран</h2>
+          <p>
+            Здесь оставлен только основной рабочий раздел. Без лишних ссылок и лишних страниц:
+            сначала заходим в молоко, затем выбираем сводку или расширенный отчёт.
+          </p>
+        </section>
+
+        <section className="module-grid">
+          <Link className="module-card" href="/dashboard/milk">
+            <div className="module-icon">М</div>
+            <strong>Молоко</strong>
+            <span>
+              Сводка за день, расширенная таблица, сравнение по месяцам и годам,
+              графики, мастит, жирность и куда продали молоко.
+            </span>
+          </Link>
+        </section>
+      </div>
     </main>
   );
 }

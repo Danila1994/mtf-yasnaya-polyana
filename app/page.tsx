@@ -1,59 +1,77 @@
-import Link from "next/link";
+"use client";
 
-export default function HomePage() {
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+const LOGIN = "Danila";
+const PASSWORD = "000000";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (window.localStorage.getItem("mtf-auth") === "yes") {
+      router.replace("/dashboard");
+    }
+  }, [router]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (login.trim() === LOGIN && password === PASSWORD) {
+      window.localStorage.setItem("mtf-auth", "yes");
+      router.replace("/dashboard");
+      return;
+    }
+
+    setError("Неверный логин или пароль.");
+  }
+
   return (
-    <main className="page">
-      <header className="header">
-        <div className="brand">
-          <div className="logo">ЯП</div>
-          <div>
-            <small>ТОО</small>
-            <strong>МТФ «Ясная Поляна»</strong>
-          </div>
-        </div>
-        <div className="status"><span className="dot" /> Прототип работает</div>
-      </header>
+    <main className="login-page">
+      <form className="login-card" onSubmit={submit}>
+        <div className="logo-mark">ЯП</div>
+        <h1 className="login-title">МТФ Ясная Поляна</h1>
+        <p className="login-subtitle">
+          Вход в рабочую систему отчётности. Сейчас доступ открыт только для пользователя Danila.
+        </p>
 
-      <section className="hero">
-        <div>
-          <div className="badge">Облачная система отчетности МТФ</div>
-          <h1>Единая отчетность фермы в защищенном кабинете</h1>
-          <p className="lead">
-            Сотрудники вносят данные с телефона, руководство видит отчеты, администратор контролирует доступы и историю изменений.
-          </p>
-          <div className="actions">
-            <Link className="btn primary" href="/login">Войти в систему</Link>
-            <Link className="btn" href="/demo">Посмотреть демо-отчет</Link>
+        <div className="form-stack">
+          <div className="field">
+            <label htmlFor="login">Логин</label>
+            <input
+              id="login"
+              className="input"
+              value={login}
+              onChange={(event) => setLogin(event.target.value)}
+              placeholder="Danila"
+              autoComplete="username"
+            />
           </div>
-          <div className="kpis">
-            <div className="kpi"><strong>24/7</strong><span>доступ с телефона и ПК</span></div>
-            <div className="kpi"><strong>Роли</strong><span>просмотр или редактирование</span></div>
-            <div className="kpi"><strong>Лог</strong><span>кто и что изменил</span></div>
-          </div>
-        </div>
 
-        <div className="card">
-          <p style={{ marginTop: 0, color: "var(--muted-2)" }}>Главное меню</p>
-          <h3>Рабочие разделы</h3>
-          <MenuItem icon="📋" title="Ежедневная сводка" text="Молоко/головы, ветеринария/осеменение, зоотехния/корма" />
-          <MenuItem icon="🛡️" title="Журнал лечения" text="Диагнозы, статусы, исходы, контроль случаев" />
-          <MenuItem icon="🐄" title="Осеменение и отёлы" text="Ввод данных по воспроизводству и приплоду" />
-          <MenuItem icon="📊" title="Отчеты руководства" text="День, неделя, месяц, экспорт в Excel" />
-          <div className="notice">Статус: вход по ролям работает. Следующий этап — подключение базы данных и настоящих пользователей.</div>
+          <div className="field">
+            <label htmlFor="password">Пароль</label>
+            <input
+              id="password"
+              className="input"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="000000"
+              autoComplete="current-password"
+            />
+          </div>
+
+          {error ? <div className="error">{error}</div> : null}
+
+          <button className="btn btn-primary" type="submit">
+            Войти
+          </button>
         </div>
-      </section>
+      </form>
     </main>
-  );
-}
-
-function MenuItem({ icon, title, text }: { icon: string; title: string; text: string }) {
-  return (
-    <div className="menu-card">
-      <div className="icon">{icon}</div>
-      <div>
-        <strong>{title}</strong>
-        <p>{text}</p>
-      </div>
-    </div>
   );
 }
